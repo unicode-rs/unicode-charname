@@ -3,6 +3,11 @@ use std::fmt;
 #[rustfmt::skip]
 mod tables;
 
+mod jamo;
+mod reserved;
+
+pub use tables::UNICODE_VERSION;
+
 pub trait CharName {
     fn char_name(self) -> Option<Name>;
     fn property_name(self) -> Option<Name>;
@@ -17,48 +22,125 @@ impl CharName for char {
     }
 }
 
-fn find_in_enumerate_names(ch: u32) -> Option<&'static [u16]> {
-    use tables::ENUMERATION_CHAR_NAMES;
-    let record_idx = ENUMERATION_CHAR_NAMES
-        .binary_search_by(|record| {
-            use std::cmp::Ordering;
-            if record.1 < ch {
-                Ordering::Less
-            } else if record.0 > ch {
-                Ordering::Greater
-            } else {
-                Ordering::Equal
-            }
-        })
-        .ok()?;
-    let offset = (ch - ENUMERATION_CHAR_NAMES[record_idx].0) as usize;
-    let index_slice = ENUMERATION_CHAR_NAMES[record_idx].2;
-    let offset_slice = ENUMERATION_CHAR_NAMES[record_idx].3;
-    let range = (offset_slice[offset] as usize)..(offset_slice[offset + 1] as usize);
-    Some(&index_slice[range])
-}
-
 impl CharName for u32 {
     fn char_name(self) -> Option<Name> {
-        if let Some(slice) = find_in_enumerate_names(self) {
+        if let Some(slice) = tables::find_in_enumerate_names(self) {
             let name = Name(NameInner::Enumeration {
                 encoded_slice: slice,
                 codepoint_repr: format!("{:04X}", self),
             });
             return Some(name);
         }
-        todo!()
+        if let Some(special_group) = tables::find_in_special_groups(self) {
+            return name_for_special_group_char(
+                self,
+                special_group,
+                CodePointLabelMode::Label {
+                    use_angle_bracket: true,
+                },
+            );
+        }
+        if reserved::is_code_point(self) {
+            if reserved::is_noncharacter(self) {
+                return Some(code_point_label("noncharacter-", self, true));
+            } else {
+                return Some(code_point_label("reserved-", self, true));
+            }
+        }
+        None
     }
 
     fn property_name(self) -> Option<Name> {
-        if let Some(slice) = find_in_enumerate_names(self) {
+        if let Some(slice) = tables::find_in_enumerate_names(self) {
             let name = Name(NameInner::Enumeration {
                 encoded_slice: slice,
                 codepoint_repr: format!("{:04X}", self),
             });
             return Some(name);
         }
-        todo!()
+        if let Some(special_group) = tables::find_in_special_groups(self) {
+            return name_for_special_group_char(self, special_group, CodePointLabelMode::None);
+        }
+        None
+    }
+}
+
+fn nr1_name(_prefix: &str, v: u32) -> Name {
+    // ignore prefix here, because hangul_name will provide one.
+    let str = jamo::hangul_name(v);
+    Name(NameInner::Generated(str))
+}
+
+fn nr2_name(prefix: &str, v: u32) -> Name {
+    Name(NameInner::Generated(format!("{}{:04X}", prefix, v)))
+}
+
+fn code_point_label(prefix: &str, v: u32, use_angle_bracket: bool) -> Name {
+    let str = if use_angle_bracket {
+        format!("<{}{:04X}>", prefix, v)
+    } else {
+        format!("{}{:04X}", prefix, v)
+    };
+    Name(NameInner::Generated(str))
+}
+
+enum CodePointLabelMode {
+    None,
+    Label { use_angle_bracket: bool },
+}
+
+fn name_for_special_group_char(
+    v: u32,
+    special_group: tables::SpecialGroup,
+    code_point_label_mode: CodePointLabelMode,
+) -> Option<Name> {
+    use tables::SpecialGroup;
+    match special_group {
+        SpecialGroup::HangulSyllable => {
+            // NR1
+            Some(nr1_name("HANGUL SYLLABLE ", v))
+        }
+        SpecialGroup::CJKIdeographExtensionA
+        | SpecialGroup::CJKIdeograph
+        | SpecialGroup::CJKIdeographExtensionB
+        | SpecialGroup::CJKIdeographExtensionC
+        | SpecialGroup::CJKIdeographExtensionD
+        | SpecialGroup::CJKIdeographExtensionE
+        | SpecialGroup::CJKIdeographExtensionF
+        | SpecialGroup::CJKIdeographExtensionG => {
+            // NR2
+            Some(nr2_name("CJK UNIFIED IDEOGRAPH-", v))
+        }
+        SpecialGroup::TangutIdeograph | SpecialGroup::TangutIdeographSupplement => {
+            // NR2
+            Some(nr2_name("TANGUT IDEOGRAPH-", v))
+        }
+        /* other NR2 cases already covered in UnicodeData.txt */
+        SpecialGroup::control => {
+            if let CodePointLabelMode::Label { use_angle_bracket } = code_point_label_mode {
+                Some(code_point_label("control-", v, use_angle_bracket))
+            } else {
+                None
+            }
+        }
+        SpecialGroup::NonPrivateUseHighSurrogate
+        | SpecialGroup::PrivateUseHighSurrogate
+        | SpecialGroup::LowSurrogate => {
+            if let CodePointLabelMode::Label { use_angle_bracket } = code_point_label_mode {
+                Some(code_point_label("surrogate-", v, use_angle_bracket))
+            } else {
+                None
+            }
+        }
+        SpecialGroup::PrivateUse
+        | SpecialGroup::Plane15PrivateUse
+        | SpecialGroup::Plane16PrivateUse => {
+            if let CodePointLabelMode::Label { use_angle_bracket } = code_point_label_mode {
+                Some(code_point_label("private-use-", v, use_angle_bracket))
+            } else {
+                None
+            }
+        }
     }
 }
 
@@ -117,34 +199,34 @@ impl<'a> Iterator for NameIter<'a> {
                 encoded_slice,
                 codepoint_repr,
             } => match self.state {
-                NameIterState::Finished => {
-                    None
-                },
+                NameIterState::Finished => None,
                 _ if self.offset >= encoded_slice.len() => {
                     self.state = NameIterState::Finished;
                     None
-                },
-                NameIterState::InsertSpace {cur_special} => {
-                    self.state = NameIterState::Middle{cur_special};
+                }
+                NameIterState::InsertSpace { cur_special } => {
+                    self.state = NameIterState::Middle { cur_special };
                     Some(tables::ENUMERATION_WORD_TABLE[tables::WORD_TABLE_INDEX_SPACE as usize])
-                },
+                }
                 _ => {
-                    /* NameIterState::Initial | NameIterState::Midle {..} */
+                    /* NameIterState::Initial | NameIterState::Middle {..} */
                     let cur_word_idx = encoded_slice[self.offset];
                     self.offset += 1;
                     if let Some(&next_word_idx) = encoded_slice.get(self.offset) {
                         let cur_special = match self.state {
-                            NameIterState::Initial => {
-                                tables::is_special_word_index(cur_word_idx)
-                            },
-                            NameIterState::Middle{cur_special} => cur_special,
+                            NameIterState::Initial => tables::is_special_word_index(cur_word_idx),
+                            NameIterState::Middle { cur_special } => cur_special,
                             _ => unreachable!(),
                         };
                         let next_special = tables::is_special_word_index(next_word_idx);
                         if !cur_special && !next_special {
-                            self.state = NameIterState::InsertSpace{cur_special: next_special};
+                            self.state = NameIterState::InsertSpace {
+                                cur_special: next_special,
+                            };
                         } else {
-                            self.state = NameIterState::Middle{cur_special: next_special};
+                            self.state = NameIterState::Middle {
+                                cur_special: next_special,
+                            };
                         }
                     } else {
                         self.state = NameIterState::Finished;

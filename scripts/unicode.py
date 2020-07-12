@@ -16,7 +16,10 @@
 # Since this should not require frequent updates, we just store this
 # out-of-line and check the unicode.rs file into git.
 
-import fileinput, re, os, sys
+import fileinput
+import re
+import os
+import sys
 
 preamble = '''// Copyright 2012-2018 The Rust Project Developers. See the COPYRIGHT
 // file at the top-level directory of this distribution and at
@@ -36,10 +39,12 @@ preamble = '''// Copyright 2012-2018 The Rust Project Developers. See the COPYRI
 
 UNICODE_VERSION = (13, 0, 0)
 
-UNICODE_VERSION_NUMBER = "%s.%s.%s" %UNICODE_VERSION
+UNICODE_VERSION_NUMBER = "%s.%s.%s" % UNICODE_VERSION
+
 
 def escape_char(c):
     return "'\\u{%x}'" % c
+
 
 def fetch(f):
     if not os.path.exists(os.path.basename(f)):
@@ -55,6 +60,8 @@ def fetch(f):
         exit(1)
 
 # Implementation from unicode-segmentation
+
+
 def load_names(f, interestingprops):
     fetch(f)
     normal_names = {}
@@ -76,16 +83,20 @@ def load_names(f, interestingprops):
             normal_names[d_ch] = d_name
     return (normal_names, special_names)
 
+
 SPACE_SYMBOL = ' '
 CODEPOINT_SYMBOL = '@'
 SPECIAL_SYMBOLS = ['-', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9']
+
 
 def tokenize(str, codepoint):
     name_sep = str
     name_sep = name_sep.replace(codepoint, CODEPOINT_SYMBOL)
     for symbol in SPECIAL_SYMBOLS:
-        name_sep = name_sep.replace(symbol, SPACE_SYMBOL + symbol + SPACE_SYMBOL)
+        name_sep = name_sep.replace(
+            symbol, SPACE_SYMBOL + symbol + SPACE_SYMBOL)
     return name_sep
+
 
 def make_wordset(names):
     word_set = {}
@@ -96,6 +107,7 @@ def make_wordset(names):
         for word in word_list:
             word_set[word] = word
     return word_set
+
 
 class WordIndex:
     def __init__(self, normal_names):
@@ -123,7 +135,7 @@ class WordIndex:
         self.word_map = word_map
         self.special_map = special_map
         self.special_list = special_list
-    
+
     def encode(self, name, codepoint):
         name_sep = tokenize(name, codepoint)
         word_list = name_sep.split(SPACE_SYMBOL)
@@ -143,15 +155,17 @@ class WordIndex:
                     encoded_sequence.append(self.word_map[SPACE_SYMBOL])
                 name_build += SPACE_SYMBOL
             if not name[len(name_build):].startswith(word):
-                raise Exception("Divergence! [%s] - [%s] vs [%s]" % (name, name[len(name_build):], word))
+                raise Exception(
+                    "Divergence! [%s] - [%s] vs [%s]" % (name, name[len(name_build):], word))
             name_build += word
             encoded_sequence.append(word_idx)
             # encoded_sequence.append(word)
             last_is_special = word_is_special
         if name_build != name:
             raise Exception("Different! [%s] vs [%s]" % (name, name_build))
-        
+
         return encoded_sequence
+
 
 def create_intervals(list):
     list.sort()
@@ -167,8 +181,10 @@ def create_intervals(list):
             in_group = False
     return result
 
+
 def create_normal_groups(normal_names):
-    normal_intervals = create_intervals([int(key, 16) for key in normal_names.keys()])
+    normal_intervals = create_intervals(
+        [int(key, 16) for key in normal_names.keys()])
     encoded_groups = []
     for first, last in normal_intervals:
         group_buffer = []
@@ -184,6 +200,7 @@ def create_normal_groups(normal_names):
         encoded_groups.append((first, last, group_buffer, pos_buffer))
     return encoded_groups
 
+
 def create_special_groups(special_names):
     item_idx = 0
     item_count = len(special_names)
@@ -198,9 +215,11 @@ def create_special_groups(special_names):
             label = m1.group(1)
             m2 = re2.match(special_names[item_idx + 1][1])
             if not m2 or m2.group(1) != label:
-                raise Exception("Pair mismatch! [%s] vs [%s]" % (special_names[item_idx], special_names[item_idx + 1]))
-            
-            result.append((int(special_names[item_idx][0], 16), int(special_names[item_idx + 1][0], 16), label))
+                raise Exception("Pair mismatch! [%s] vs [%s]" % (
+                    special_names[item_idx], special_names[item_idx + 1]))
+
+            result.append((int(special_names[item_idx][0], 16), int(
+                special_names[item_idx + 1][0], 16), label))
             item_idx += 2
             continue
         m3 = re3.match(item_text)
@@ -211,25 +230,30 @@ def create_special_groups(special_names):
             while try_item_idx < item_count and special_names[try_item_idx][1] == item_text:
                 last_repeat_item_idx = try_item_idx
                 try_item_idx += 1
-            result.append((int(special_names[item_idx][0], 16), int(special_names[last_repeat_item_idx][0], 16), label))
+            result.append((int(special_names[item_idx][0], 16), int(
+                special_names[last_repeat_item_idx][0], 16), label))
             item_idx = last_repeat_item_idx + 1
             continue
-            
+
         raise Exception("Unexpected item: %s" % item_text)
     return result
+
 
 def write_enumeration_char_names(rf, encoded_groups):
     rf.write("""
 pub const ENUMERATION_CHAR_NAMES: &'static [(u32, u32, &'static [u16], &'static [u32])] = &[
 """)
     for (first, last, group_buffer, pos_buffer) in encoded_groups:
-        rf.write("\t(%d, %d, &%s, &%s),\n" % (first, last, group_buffer, pos_buffer))
+        rf.write("\t(%d, %d, &%s, &%s),\n" %
+                 (first, last, group_buffer, pos_buffer))
     rf.write("""];
 """)
+
 
 def write_special_groups(rf, special_groups):
     rf.write("""
 #[allow(non_camel_case_types)]
+#[derive(Copy, Clone, PartialEq, Eq)]
 pub enum SpecialGroup {
 """)
     for ((_, _, groupname)) in special_groups:
@@ -249,7 +273,26 @@ pub const SPECIAL_GROUPS: &'static [(u32, u32, SpecialGroup)] = &[
         if (idx + 1) % 2 == 0:
             rf.write('\n')
     rf.write("""];
+
+pub fn find_in_special_groups(ch: u32) -> Option<SpecialGroup> {
+    let record_idx = SPECIAL_GROUPS
+        .binary_search_by(|record| {
+            use std::cmp::Ordering;
+            if record.1 < ch {
+                Ordering::Less
+            } else if record.0 > ch {
+                Ordering::Greater
+            } else {
+                Ordering::Equal
+            }
+        })
+        .ok()?;
+    let group = SPECIAL_GROUPS[record_idx].2;
+    Some(group)
+}
+
 """)
+
 
 def write_word_table(rf, word_table):
     rf.write("""
@@ -262,7 +305,28 @@ pub const ENUMERATION_WORD_TABLE: &'static [&'static str] = &[
         if (idx + 1) % 8 == 0:
             rf.write('\n')
     rf.write("""];
+
+pub fn find_in_enumerate_names(ch: u32) -> Option<&'static [u16]> {
+    let record_idx = ENUMERATION_CHAR_NAMES
+        .binary_search_by(|record| {
+            use std::cmp::Ordering;
+            if record.1 < ch {
+                Ordering::Less
+            } else if record.0 > ch {
+                Ordering::Greater
+            } else {
+                Ordering::Equal
+            }
+        })
+        .ok()?;
+    let offset = (ch - ENUMERATION_CHAR_NAMES[record_idx].0) as usize;
+    let index_slice = ENUMERATION_CHAR_NAMES[record_idx].2;
+    let offset_slice = ENUMERATION_CHAR_NAMES[record_idx].3;
+    let range = (offset_slice[offset] as usize)..(offset_slice[offset + 1] as usize);
+    Some(&index_slice[range])
+}
 """)
+
 
 def write_special_symbols(rf, word_index):
     rf.write("""
@@ -279,11 +343,11 @@ pub fn is_special_word_index(v: u16) -> bool {
 """)
     for (first, last) in special_intervals:
         rf.write("\t\t%d..=%d => true,\n" % (first, last))
-    rf.write("""
-        _ => false,
+    rf.write("""\t\t_ => false,
     }
 }
 """)
+
 
 if __name__ == "__main__":
     r = "tables.rs"
@@ -302,9 +366,8 @@ pub const UNICODE_VERSION: (u64, u64, u64) = (%s, %s, %s);
         word_index = WordIndex(normal_names)
         normal_encoded_groups = create_normal_groups(normal_names)
         special_groups = create_special_groups(special_names)
-        
+
         write_enumeration_char_names(rf, normal_encoded_groups)
         write_special_groups(rf, special_groups)
         write_word_table(rf, word_index.word_list)
         write_special_symbols(rf, word_index)
-

@@ -689,6 +689,7 @@ pub const ENUMERATION_CHAR_NAMES: &'static [(u32, u32, &'static [u16], &'static 
 ];
 
 #[allow(non_camel_case_types)]
+#[derive(Copy, Clone, PartialEq, Eq)]
 pub enum SpecialGroup {
 	control,
 	CJKIdeographExtensionA,
@@ -721,6 +722,24 @@ pub const SPECIAL_GROUPS: &'static [(u32, u32, SpecialGroup)] = &[
 	(183984, 191456, SpecialGroup::CJKIdeographExtensionF), (196608, 201546, SpecialGroup::CJKIdeographExtensionG), 
 	(983040, 1048573, SpecialGroup::Plane15PrivateUse), (1048576, 1114109, SpecialGroup::Plane16PrivateUse), 
 ];
+
+pub fn find_in_special_groups(ch: u32) -> Option<SpecialGroup> {
+    let record_idx = SPECIAL_GROUPS
+        .binary_search_by(|record| {
+            use std::cmp::Ordering;
+            if record.1 < ch {
+                Ordering::Less
+            } else if record.0 > ch {
+                Ordering::Greater
+            } else {
+                Ordering::Equal
+            }
+        })
+        .ok()?;
+    let group = SPECIAL_GROUPS[record_idx].2;
+    Some(group)
+}
+
 
 pub const ENUMERATION_WORD_TABLE: &'static [&'static str] = &[
 	"", " ", "-", "0", "1", "2", "3", "4", 
@@ -1730,6 +1749,26 @@ pub const ENUMERATION_WORD_TABLE: &'static [&'static str] = &[
 	"ZZU", "ZZUP", "ZZUR", "ZZURX", "ZZUX", "ZZY", "ZZYA", "ZZYP", 
 	"ZZYR", "ZZYRX", "ZZYT", "ZZYX", ];
 
+pub fn find_in_enumerate_names(ch: u32) -> Option<&'static [u16]> {
+    let record_idx = ENUMERATION_CHAR_NAMES
+        .binary_search_by(|record| {
+            use std::cmp::Ordering;
+            if record.1 < ch {
+                Ordering::Less
+            } else if record.0 > ch {
+                Ordering::Greater
+            } else {
+                Ordering::Equal
+            }
+        })
+        .ok()?;
+    let offset = (ch - ENUMERATION_CHAR_NAMES[record_idx].0) as usize;
+    let index_slice = ENUMERATION_CHAR_NAMES[record_idx].2;
+    let offset_slice = ENUMERATION_CHAR_NAMES[record_idx].3;
+    let range = (offset_slice[offset] as usize)..(offset_slice[offset + 1] as usize);
+    Some(&index_slice[range])
+}
+
 pub const WORD_TABLE_INDEX_SPACE: u16 = 1;
 
 pub const WORD_TABLE_INDEX_CODEPOINT: u16 = 13;
@@ -1737,7 +1776,6 @@ pub const WORD_TABLE_INDEX_CODEPOINT: u16 = 13;
 pub fn is_special_word_index(v: u16) -> bool {
     match v {
 		2..=13 => true,
-
-        _ => false,
+		_ => false,
     }
 }
