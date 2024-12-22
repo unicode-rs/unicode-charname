@@ -37,7 +37,7 @@ preamble = '''// Copyright 2012-2018 The Rust Project Developers. See the COPYRI
 
 '''
 
-UNICODE_VERSION = (15, 0, 0)
+UNICODE_VERSION = (16, 0, 0)
 
 UNICODE_VERSION_NUMBER = "%s.%s.%s" % UNICODE_VERSION
 

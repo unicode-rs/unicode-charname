@@ -108,7 +108,8 @@ fn name_for_special_group_char(
         | SpecialGroup::CJKIdeographExtensionE
         | SpecialGroup::CJKIdeographExtensionF
         | SpecialGroup::CJKIdeographExtensionG
-        | SpecialGroup::CJKIdeographExtensionH => {
+        | SpecialGroup::CJKIdeographExtensionH
+        | SpecialGroup::CJKIdeographExtensionI => {
             // NR2
             Some(nr2_name("CJK UNIFIED IDEOGRAPH-", v))
         }
