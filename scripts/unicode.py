@@ -37,7 +37,7 @@ preamble = '''// Copyright 2012-2018 The Rust Project Developers. See the COPYRI
 
 '''
 
-UNICODE_VERSION = (13, 0, 0)
+UNICODE_VERSION = (17, 0, 0)
 
 UNICODE_VERSION_NUMBER = "%s.%s.%s" % UNICODE_VERSION
 
@@ -130,6 +130,9 @@ class WordIndex:
         codepoint_symbol_idx = word_map[CODEPOINT_SYMBOL]
         special_map[codepoint_symbol_idx] = True
         special_list.append(codepoint_symbol_idx)
+        space_symbol_idx = word_map[SPACE_SYMBOL]
+        special_map[space_symbol_idx] = True
+        special_list.append(space_symbol_idx)
         special_list.sort()
         self.word_list = word_list
         self.word_map = word_map
