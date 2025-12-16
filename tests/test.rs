@@ -70,6 +70,14 @@ fn test_names() {
         some_s("CJK COMPATIBILITY IDEOGRAPH-FA29"),
         0xFA29u32.char_name().map(|x| x.to_string())
     );
+    assert_eq!(
+        some_s("SOYOMBO FINAL CONSONANT SIGN -A"),
+        0x11A95.property_name().map(|x| x.to_string())
+    );
+    assert_eq!(
+        some_s("SOYOMBO FINAL CONSONANT SIGN -A"),
+        0x11A95.char_name().map(|x| x.to_string())
+    );
     assert_eq!(None, 0x1029Fu32.property_name().map(|x| x.to_string()));
     assert_eq!(
         some_s("<reserved-1029F>"),

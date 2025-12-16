@@ -1881,7 +1881,7 @@ pub const WORD_TABLE_INDEX_CODEPOINT: u16 = 13;
 
 pub fn is_special_word_index(v: u16) -> bool {
     match v {
-		2..=13 => true,
+		1..=13 => true,
 		_ => false,
     }
 }
