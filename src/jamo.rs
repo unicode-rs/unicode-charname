@@ -1,6 +1,9 @@
 #![allow(dead_code)]
 // This is adapted from Unicode 13.0, 3.12.
 
+#[cfg(not(feature = "std"))]
+use alloc::string::String;
+
 const S_BASE: u32 = 0xAC00;
 const L_BASE: u32 = 0x1100;
 const V_BASE: u32 = 0x1161;
@@ -32,7 +35,7 @@ pub(crate) fn hangul_name(s: u32) -> String {
     let l_index = s_index / N_COUNT;
     let v_index = (s_index % N_COUNT) / T_COUNT;
     let t_index = s_index % T_COUNT;
-    format!(
+    alloc::format!(
         "HANGUL SYLLABLE {}{}{}",
         JAMO_L_TABLE[l_index as usize],
         JAMO_V_TABLE[v_index as usize],

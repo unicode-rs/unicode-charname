@@ -1,4 +1,57 @@
-use std::fmt;
+// Copyright 2012-2015 The Rust Project Developers. See the COPYRIGHT
+// file at the top-level directory of this distribution and at
+// http://rust-lang.org/COPYRIGHT.
+//
+// Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
+// http://www.apache.org/licenses/LICENSE-2.0> or the MIT license
+// <LICENSE-MIT or http://opensource.org/licenses/MIT>, at your
+// option. This file may not be copied, modified, or distributed
+// except according to those terms.
+
+//! Unicode character name properties
+//! as described in
+//! [Unicode Standard Annex #44](http://www.unicode.org/reports/tr44/).
+//!
+//! ```rust
+//! extern crate unicode_charname;
+//!
+//! use unicode_charname::CharName;
+//!
+//! fn main() {
+//!     assert_eq!('A'.char_name().unwrap_or_default().to_string(),
+//!                "LATIN CAPITAL LETTER A");
+//! }
+//! ```
+//!
+//! ## crates.io
+//!
+//! You can use this package in your project by adding the following
+//! to your `Cargo.toml`:
+//!
+//! ```toml
+//! [dependencies]
+//! unicode-charname = "0.1"
+//! ```
+//!
+//! ## `no_std` + `alloc` support
+//!
+//! This crate is completely `no_std` + `alloc` compatible. This can be enabled by disabling the `std` feature, i.e. specifying `default-features = false` for this crate on your `Cargo.toml`.
+
+#![deny(missing_docs, unsafe_code)]
+#![doc(
+    html_logo_url = "https://unicode-rs.github.io/unicode-rs_sm.png",
+    html_favicon_url = "https://unicode-rs.github.io/unicode-rs_sm.png"
+)]
+#![cfg_attr(not(feature = "std"), no_std)]
+
+extern crate alloc;
+
+#[cfg(feature = "std")]
+extern crate core;
+
+#[cfg(not(feature = "std"))]
+use alloc::string::String;
+use core::fmt;
 
 #[rustfmt::skip]
 mod tables;
@@ -8,8 +61,53 @@ mod reserved;
 
 pub use tables::UNICODE_VERSION;
 
+/// Methods for retrieving character name for a code point.
 pub trait CharName {
+    /// Retrieve the character name for a code point.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use unicode_charname::CharName;
+    /// assert_eq!('\u{1F402}'.char_name().unwrap_or_default().to_string(), "OX");
+    /// ```
+    ///
+    /// Note that for all code points having a property value
+    /// of na = "" for the Name property, the return value
+    /// will be its hex representation dash-prefixed with a special label
+    /// indicating its code point type (See D10a Code point type within
+    /// the Unicode standard) within angle brackets.
+    /// 
+    /// The following special labels are used: `control`, `private-use`,
+    /// `surrogate`, `noncharacter` and `reserved`.
+    /// # Examples
+    ///
+    /// ```
+    /// # use unicode_charname::CharName;
+    /// assert_eq!('\u{81}'.char_name().unwrap_or_default().to_string(), "<control-0081>");
+    /// ```
+    /// This function never return `None` for valid
+    /// Unicode code points, but always return `None` for
+    /// other integers.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use unicode_charname::CharName;
+    /// assert!(0x200000.char_name().is_none());
+    /// ```
     fn char_name(self) -> Option<Name>;
+
+    /// Retrieve the Unicode Name property value for a code point.
+    ///
+    /// Similar to `char_name` function, but also returns `None` for
+    /// all code points having a property value of na = "" for the Name property.
+    /// # Examples
+    ///
+    /// ```
+    /// # use unicode_charname::CharName;
+    /// assert!('\u{81}'.property_name().is_none());
+    /// ```
     fn property_name(self) -> Option<Name>;
 }
 
@@ -27,7 +125,7 @@ impl CharName for u32 {
         if let Some(slice) = tables::find_in_enumerate_names(self) {
             let name = Name(NameInner::Enumeration {
                 encoded_slice: slice,
-                codepoint_repr: format!("{:04X}", self),
+                codepoint_repr: alloc::format!("{:04X}", self),
             });
             return Some(name);
         }
@@ -54,7 +152,7 @@ impl CharName for u32 {
         if let Some(slice) = tables::find_in_enumerate_names(self) {
             let name = Name(NameInner::Enumeration {
                 encoded_slice: slice,
-                codepoint_repr: format!("{:04X}", self),
+                codepoint_repr: alloc::format!("{:04X}", self),
             });
             return Some(name);
         }
@@ -72,14 +170,14 @@ fn nr1_name(_prefix: &str, v: u32) -> Name {
 }
 
 fn nr2_name(prefix: &str, v: u32) -> Name {
-    Name(NameInner::Generated(format!("{}{:04X}", prefix, v)))
+    Name(NameInner::Generated(alloc::format!("{}{:04X}", prefix, v)))
 }
 
 fn code_point_label(prefix: &str, v: u32, use_angle_bracket: bool) -> Name {
     let str = if use_angle_bracket {
-        format!("<{}{:04X}>", prefix, v)
+        alloc::format!("<{}{:04X}>", prefix, v)
     } else {
-        format!("{}{:04X}", prefix, v)
+        alloc::format!("{}{:04X}", prefix, v)
     };
     Name(NameInner::Generated(str))
 }
@@ -156,8 +254,19 @@ enum NameInner {
     Generated(String),
 }
 
+/// Represents retrieved Unicode character name.
+///
+/// It implements the `Display` trait and can also
+/// be converted to a `String` value with `to_string`
+/// method.
 #[derive(Clone)]
 pub struct Name(NameInner);
+
+impl Default for Name {
+    fn default() -> Self {
+        Name(NameInner::Generated(Default::default()))
+    }
+}
 
 impl Name {
     fn iter(&self) -> NameIter<'_> {
@@ -180,7 +289,7 @@ impl fmt::Display for Name {
 
 #[derive(Clone)]
 #[non_exhaustive]
-pub struct NameIter<'a> {
+struct NameIter<'a> {
     name: &'a NameInner,
     offset: usize,
     state: NameIterState,
