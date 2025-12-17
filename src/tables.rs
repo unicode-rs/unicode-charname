@@ -14,7 +14,7 @@
 
 
 /// The version of [Unicode](http://www.unicode.org/)
-/// that this version of unicode-name is based on.
+/// that this version of unicode-charname is based on.
 pub const UNICODE_VERSION: (u64, u64, u64) = (17, 0, 0);
 
 pub const ENUMERATION_CHAR_NAMES: &'static [(u32, u32, &'static [u16], &'static [u32])] = &[
@@ -790,7 +790,7 @@ pub const SPECIAL_GROUPS: &'static [(u32, u32, SpecialGroup)] = &[
 pub fn find_in_special_groups(ch: u32) -> Option<SpecialGroup> {
     let record_idx = SPECIAL_GROUPS
         .binary_search_by(|record| {
-            use std::cmp::Ordering;
+            use core::cmp::Ordering;
             if record.1 < ch {
                 Ordering::Less
             } else if record.0 > ch {
@@ -1878,7 +1878,7 @@ pub const ENUMERATION_WORD_TABLE: &'static [&'static str] = &[
 pub fn find_in_enumerate_names(ch: u32) -> Option<&'static [u16]> {
     let record_idx = ENUMERATION_CHAR_NAMES
         .binary_search_by(|record| {
-            use std::cmp::Ordering;
+            use core::cmp::Ordering;
             if record.1 < ch {
                 Ordering::Less
             } else if record.0 > ch {

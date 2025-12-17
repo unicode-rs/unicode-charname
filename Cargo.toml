@@ -1,9 +1,24 @@
 [package]
 name = "unicode-charname"
 version = "0.1.0"
-authors = ["Charles Lew <crlf0710@gmail.com>"]
-edition = "2018"
+authors = ["Charles Lew <crlf0710@gmail.com>", "Manish Goregaokar <manishsmail@gmail.com>"]
+homepage = "https://github.com/unicode-rs/unicode-charname"
+repository = "https://github.com/unicode-rs/unicode-charname"
+documentation = "https://docs.rs/unicode-charname/"
 license = "MIT/Apache-2.0"
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+keywords = ["text", "unicode", "charname"]
+edition = "2018"
+readme = "README.md"
+description = """
+This crate provides functions for retrieving Unicode character name
+properties as described in
+Unicode Standard Annex #44.
+"""
+
+exclude = [ "target/*", "Cargo.lock", "scripts/tmp", "*.txt", "tests/*" ]
 
 [dependencies]
+
+[features]
+default = ["std"]
+std = []
